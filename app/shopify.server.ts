@@ -4,8 +4,7 @@ import {
   AppDistribution,
   shopifyApp,
 } from "@shopify/shopify-app-remix/server";
-import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
-import prisma from "./db.server";
+import { RalfSessionStorage } from "./lib/session-storage.server";
 import { connectMerchant } from "./lib/ralf.server";
 
 const shopify = shopifyApp({
@@ -15,7 +14,8 @@ const shopify = shopifyApp({
   scopes: process.env.SCOPES?.split(","),
   appUrl: process.env.SHOPIFY_APP_URL || "",
   authPathPrefix: "/auth",
-  sessionStorage: new PrismaSessionStorage(prisma),
+  // Stateless: sessions live in the Ralf backend, so the app needs no DB.
+  sessionStorage: new RalfSessionStorage(),
   distribution: AppDistribution.AppStore,
   future: {
     unstable_newEmbeddedAuthStrategy: true,
@@ -23,11 +23,9 @@ const shopify = shopifyApp({
   },
   hooks: {
     afterAuth: async ({ session, admin }) => {
-      // Register app/uninstalled (compliance webhooks are app-specific in the
-      // TOML and registered on deploy).
       await shopify.registerWebhooks({ session });
-      // Provision / refresh the merchant on the Ralf backend and store the
-      // returned per-merchant API key. Best-effort: never block the install.
+      // Provision / refresh the merchant on the Ralf backend. Best-effort:
+      // never block the install.
       try {
         await connectMerchant(session, admin);
       } catch (err) {

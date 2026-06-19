@@ -48,7 +48,7 @@ and the Shopify CLI (`npm install -g @shopify/cli@latest`).
      in this app's `.env` as `RALF_APP_SECRET`.
    - `SHOPIFY_API_SECRET` — your Shopify app's API secret key (used by the Ralf
      GDPR webhook handler to verify Shopify's signature).
-4. **Install dependencies & DB:** `npm install` then `npm run setup`.
+4. **Install dependencies:** `npm install`. (No database setup — the app is stateless; sessions live in the Ralf backend.)
 5. **Run it:** `npm run dev` — the CLI links the app, opens a tunnel, and lets you
    install it on your dev store. The app loads embedded in the Shopify admin.
 6. **Deploy config** (scopes + webhooks): `npm run deploy`.
@@ -77,8 +77,8 @@ pricing section. The Settings screen's "View plans" button sends merchants there
 ## Notes
 - Built on the official `@shopify/shopify-app-remix` template conventions, so the
   Shopify CLI (`shopify app dev` / `deploy`) works as documented.
-- Dev uses SQLite for sessions. For production, switch `prisma/schema.prisma`
-  provider to `postgresql` and point `DATABASE_URL` at hosted Postgres.
+- The app is stateless: Shopify sessions are stored in the Ralf backend over
+  HTTP, so it runs on Vercel (or any serverless host) with no database to set up.
 - Scopes are read-only (`read_products,read_content,read_themes`). Applying fixes
   is returned as content/guidance for now; a write flow can be added later behind
   an explicit opt-in.

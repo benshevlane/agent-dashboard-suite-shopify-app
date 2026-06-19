@@ -1,13 +1,12 @@
 // =============================================================================
 // Ralf backend client
 // =============================================================================
-// Thin server-side wrapper around the deployed Ralf `shopify-app-api` edge
-// function. `connectMerchant` runs once at install (afterAuth); the per-screen
-// helpers authenticate with the stored per-merchant API key.
+// Thin server-side wrapper around the deployed Ralf `shopify-app-api`. The app
+// stores nothing locally: the per-merchant API key is fetched from Ralf by shop
+// (cached for the lifetime of a warm serverless instance).
 // =============================================================================
 
 import type { Session } from "@shopify/shopify-app-remix/server";
-import prisma from "../db.server";
 
 const RALF_API_BASE =
   process.env.RALF_API_BASE ??
@@ -15,6 +14,20 @@ const RALF_API_BASE =
 const RALF_APP_SECRET = process.env.RALF_APP_SECRET ?? "";
 
 type AdminLike = { graphql: (q: string, opts?: any) => Promise<Response> };
+
+// shop -> ralf api key (warm-instance cache)
+const keyCache = new Map<string, string>();
+
+async function appCall(action: string, body: Record<string, unknown>): Promise<any> {
+  const res = await fetch(`${RALF_API_BASE}/${action}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-ralf-app-secret": RALF_APP_SECRET },
+    body: JSON.stringify(body),
+  });
+  let data: any = null;
+  try { data = await res.json(); } catch { /* ignore */ }
+  return { ok: res.ok, status: res.status, data };
+}
 
 // --- Install-time provisioning ---------------------------------------------
 
@@ -32,7 +45,6 @@ const SHOP_CONTEXT_QUERY = `#graphql
   }`;
 
 export async function connectMerchant(session: Session, admin: AdminLike) {
-  // Gather store context to ground the AEO prompt seeding.
   let ctx: Record<string, any> = {};
   try {
     const res = await admin.graphql(SHOP_CONTEXT_QUERY);
@@ -58,7 +70,7 @@ export async function connectMerchant(session: Session, admin: AdminLike) {
     console.error("[connectMerchant] shop context query failed:", err);
   }
 
-  const payload = {
+  const { ok, status, data } = await appCall("connect", {
     shop_domain: session.shop,
     storefront_domain: ctx.storefront_domain ?? session.shop,
     shop_name: ctx.shop_name ?? session.shop,
@@ -68,46 +80,39 @@ export async function connectMerchant(session: Session, admin: AdminLike) {
     iana_timezone: ctx.iana_timezone ?? undefined,
     access_token: session.accessToken ?? undefined,
     store_context: ctx.store_context ?? {},
-  };
-
-  const res = await fetch(`${RALF_API_BASE}/connect`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-ralf-app-secret": RALF_APP_SECRET },
-    body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error(`Ralf connect ${res.status}: ${await res.text()}`);
-  const data = await res.json();
-  if (!data.api_key) throw new Error("Ralf connect returned no api_key");
-
-  await prisma.ralfMerchant.upsert({
-    where: { shop: session.shop },
-    update: { ralfApiKey: data.api_key, siteId: data.site_id ?? null, accountId: data.account_id ?? null },
-    create: { shop: session.shop, ralfApiKey: data.api_key, siteId: data.site_id ?? null, accountId: data.account_id ?? null },
-  });
+  if (!ok) throw new Error(`Ralf connect ${status}`);
+  if (data?.api_key) keyCache.set(session.shop, data.api_key);
   return data;
 }
 
 // --- Per-screen calls --------------------------------------------------------
 
 async function apiKeyFor(shop: string): Promise<string | null> {
-  const row = await prisma.ralfMerchant.findUnique({ where: { shop } });
-  return row?.ralfApiKey ?? null;
+  const cached = keyCache.get(shop);
+  if (cached) return cached;
+  const { ok, data } = await appCall("get-key", { shop });
+  if (ok && data?.api_key) {
+    keyCache.set(shop, data.api_key);
+    return data.api_key;
+  }
+  return null;
 }
 
 /**
- * Call a Ralf action for the given shop. Returns { ok, status, data }.
- * `notConnected` is true when the merchant has no stored key yet (install
- * still completing) so screens can show a friendly "setting up" state.
+ * Call a Ralf merchant action for the given shop. `notConnected` is true when
+ * the merchant has no key yet (install still completing), so screens can show a
+ * friendly "setting up" state.
  */
 export async function ralf(
   shop: string,
   action: string,
-  opts: { method?: "GET" | "POST"; body?: Record<string, any> } = {},
+  opts: { body?: Record<string, any> } = {},
 ): Promise<{ ok: boolean; status: number; data: any; notConnected?: boolean }> {
   const key = await apiKeyFor(shop);
   if (!key) return { ok: false, status: 409, data: null, notConnected: true };
   const res = await fetch(`${RALF_API_BASE}/${action}`, {
-    method: opts.method ?? "POST",
+    method: "POST",
     headers: { "Content-Type": "application/json", "x-ralf-api-key": key },
     body: JSON.stringify(opts.body ?? {}),
   });

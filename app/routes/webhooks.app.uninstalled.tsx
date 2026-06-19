@@ -1,15 +1,19 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
-import prisma from "../db.server";
+import { RalfSessionStorage } from "../lib/session-storage.server";
 
-// Shopify verifies the HMAC for us via authenticate.webhook. On uninstall we
-// clear local sessions. (The Ralf backend also receives app/uninstalled +
+// Shopify verifies the HMAC via authenticate.webhook. On uninstall we clear the
+// shop's stored sessions. (The Ralf backend also receives app/uninstalled +
 // shop/redact and handles data deletion on its side.)
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { shop, session, topic } = await authenticate.webhook(request);
+  const { shop, topic } = await authenticate.webhook(request);
   console.log(`Received ${topic} webhook for ${shop}`);
-  if (session) {
-    await prisma.session.deleteMany({ where: { shop } });
+  try {
+    const storage = new RalfSessionStorage();
+    const sessions = await storage.findSessionsByShop(shop);
+    if (sessions.length) await storage.deleteSessions(sessions.map((s) => s.id));
+  } catch (err) {
+    console.error("[uninstalled] session cleanup failed:", err);
   }
   return new Response();
 };
