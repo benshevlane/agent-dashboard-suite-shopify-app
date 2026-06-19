@@ -1,0 +1,43 @@
+# Ralf — AI Search Visibility (Shopify app configuration)
+# Fill client_id + application_url after you create the app in the Shopify
+# Partner Dashboard, then run `shopify app config link`.
+
+name = "Ralf — AI Search Visibility"
+handle = "ralf-ai-search-visibility"
+client_id = "aca1e426c2616d10681fff4d30c9be09"
+application_url = "https://REPLACE_WITH_APP_URL"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+include_config_on_deploy = true
+
+[access_scopes]
+# Read-only: the app pulls store content to analyse it. No write scopes needed
+# for the MVP (fixes are returned as artifacts/guidance, applied by the merchant
+# or a future opt-in write flow).
+scopes = "read_products,read_content,read_themes"
+
+[auth]
+redirect_urls = [
+  "https://REPLACE_WITH_APP_URL/auth/callback",
+  "https://REPLACE_WITH_APP_URL/auth/shopify/callback",
+  "https://REPLACE_WITH_APP_URL/api/auth/callback"
+]
+
+[webhooks]
+api_version = "2025-01"
+
+# App uninstall — handled locally to clear the session row.
+[[webhooks.subscriptions]]
+topics = [ "app/uninstalled" ]
+uri = "/webhooks/app/uninstalled"
+
+# Mandatory GDPR compliance webhooks — pointed directly at the Ralf backend
+# function that already verifies the Shopify HMAC and performs redaction.
+[[webhooks.subscriptions]]
+uri = "https://ewkrubluzctsfnkxnmsj.supabase.co/functions/v1/shopify-gdpr-webhooks"
+compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+
+[pos]
+embedded = false
