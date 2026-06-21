@@ -5,7 +5,7 @@
 name = "Ralf — AI Search Visibility"
 handle = "ralf-ai-search-visibility"
 client_id = "aca1e426c2616d10681fff4d30c9be09"
-application_url = "https://REPLACE_WITH_APP_URL"
+application_url = "https://agent-dashboard-suite-shopify-app.vercel.app"
 embedded = true
 
 [build]
@@ -20,9 +20,9 @@ scopes = "read_products,read_content,read_themes"
 
 [auth]
 redirect_urls = [
-  "https://REPLACE_WITH_APP_URL/auth/callback",
-  "https://REPLACE_WITH_APP_URL/auth/shopify/callback",
-  "https://REPLACE_WITH_APP_URL/api/auth/callback"
+  "https://agent-dashboard-suite-shopify-app.vercel.app/auth/callback",
+  "https://agent-dashboard-suite-shopify-app.vercel.app/auth/shopify/callback",
+  "https://agent-dashboard-suite-shopify-app.vercel.app/api/auth/callback"
 ]
 
 [webhooks]
