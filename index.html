@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="shopify-api-key" content="aca1e426c2616d10681fff4d30c9be09" />
+<script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
+<title>Ralf — AI Search Visibility</title>
+<style>
+  :root{--bg:#f6f6f7;--card:#fff;--bd:#e3e3e3;--tx:#202223;--sub:#6d7175;--brand:#5c6ac4;--ok:#108043;--warn:#b98900;--crit:#bf0711}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--tx);font-size:14px}
+  .wrap{max-width:920px;margin:0 auto;padding:16px}
+  h1{font-size:20px;margin:4px 0 16px}
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--bd);margin-bottom:16px;flex-wrap:wrap}
+  .tab{padding:8px 12px;cursor:pointer;border:none;background:none;font-size:14px;color:var(--sub);border-bottom:2px solid transparent}
+  .tab.active{color:var(--tx);border-bottom-color:var(--brand);font-weight:600}
+  .card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:12px}
+  .row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f1f1f1;gap:12px}
+  .row:last-child{border-bottom:none}
+  .score{font-size:48px;font-weight:700;line-height:1}
+  .muted{color:var(--sub)}
+  .badge{padding:2px 8px;border-radius:10px;font-size:12px;font-weight:600;white-space:nowrap}
+  .b-ok{background:#e3f1df;color:var(--ok)}.b-warn{background:#fff5e0;color:var(--warn)}.b-crit{background:#fbeae5;color:var(--crit)}.b-neutral{background:#f1f1f1;color:var(--sub)}
+  .btn{background:var(--brand);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:14px;cursor:pointer;text-decoration:none;display:inline-block}
+  .btn.sec{background:#fff;color:var(--tx);border:1px solid var(--bd)}
+  .bar{height:10px;border-radius:6px;background:#eee;overflow:hidden}
+  .bar>i{display:block;height:100%;background:var(--brand)}
+  pre{white-space:pre-wrap;background:#f6f6f7;border-radius:8px;padding:10px;font-size:12px;max-height:280px;overflow:auto}
+  .center{text-align:center;padding:40px 0;color:var(--sub)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Ralf — AI Search Visibility</h1>
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-t="dash">Dashboard</button>
+    <button class="tab" data-t="audit">AI Visibility Audit</button>
+    <button class="tab" data-t="wins">Quick Wins</button>
+    <button class="tab" data-t="llms">LLMs.txt</button>
+    <button class="tab" data-t="set">Settings</button>
+  </div>
+  <div id="view"><div class="center">Loading your AI visibility…</div></div>
+</div>
+<script>
+const FN="https://ewkrubluzctsfnkxnmsj.supabase.co/functions/v1/shopify-embedded-app";
+let TOKEN=null, DATA=null, TAB='dash';
+function esc(s){return (s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+async function token(){ if(!TOKEN) TOKEN= await shopify.idToken(); return TOKEN; }
+async function call(action){
+  const t = await token();
+  const r = await fetch(FN+'?action='+(action||'data'), {method:'POST', headers:{Authorization:'Bearer '+t}});
+  return r.json();
+}
+async function boot(){
+  try{ DATA = await call('data'); render(); }
+  catch(e){ document.getElementById('view').innerHTML='<div class="card">Could not load. '+esc(e&&e.message)+'</div>'; }
+}
+document.getElementById('tabs').addEventListener('click',e=>{ if(e.target.dataset.t){ TAB=e.target.dataset.t; document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.t===TAB)); render(); }});
+function badge(txt,kind){return '<span class="badge b-'+kind+'">'+esc(txt)+'</span>';}
+function render(){
+  const v=document.getElementById('view'); if(!DATA){return;}
+  if(TAB==='dash') v.innerHTML=dash();
+  else if(TAB==='audit') v.innerHTML=audit();
+  else if(TAB==='wins') v.innerHTML=wins();
+  else if(TAB==='llms') v.innerHTML=llms();
+  else v.innerHTML=settings();
+  wire();
+}
+function dash(){
+  const s=DATA.score||{}; const has=s.has_data; const sc=has?(s.overall_score||0):0;
+  const engines=[['ChatGPT','openai_chat'],['Perplexity','perplexity'],['Claude','claude'],['Gemini','google_aio']];
+  const er=(s.engines||[]);
+  let eh=engines.map(function(e){var label=e[0],id=e[1];var m=er.find(function(x){return x.engine_id===id||(x.display_name||'').toLowerCase().indexOf(label.toLowerCase())>=0;});var cited=m&&(m.cited_count||0)>0;return '<div class="row"><span>'+label+'</span>'+(!has?badge('Pending','neutral'):cited?badge('Citing you','ok'):badge('Not yet','warn'))+'</div>';}).join('');
+  const wins3=((DATA.quickwins&&DATA.quickwins.quick_wins)||[]).slice(0,3).map(function(w){return '<div class="row"><span><b>'+esc(w.title)+'</b><br><span class="muted">'+esc(w.why)+'</span></span></div>';}).join('')||'<div class="muted">No actions yet.</div>';
+  return '<div class="card"><div class="muted">AI visibility score'+(s.as_of?' — as of '+esc(s.as_of):'')+'</div>'+
+    '<div style="display:flex;gap:16px;align-items:center;margin:8px 0"><div class="score">'+(has?sc:'—')+'</div><div style="flex:1"><div class="bar"><i style="width:'+(has?sc:0)+'%"></i></div></div></div>'+
+    '<div class="muted">How often your store is cited when shoppers ask AI assistants for recommendations. Higher is better.</div>'+
+    (has?'':'<div style="margin-top:8px">'+badge('First scan running — scores appear shortly','neutral')+'</div>')+'</div>'+
+    '<div class="card"><b>Which AI engines cite you</b>'+eh+'</div>'+
+    '<div class="card"><b>Top priority actions</b>'+wins3+'</div>';
+}
+function audit(){
+  const a=DATA.audit||{}; if(!a.has_data) return '<div class="card center">'+esc(a.status_note||'Your first site crawl is running — check back shortly.')+'</div>';
+  const sub=a.sub_scores||{}; const pairs=[['Crawlability',sub.crawlability],['On-page',sub.onpage],['Performance',sub.performance],['Architecture',sub.architecture],['Content',sub.content]];
+  const sc=pairs.map(function(p){return '<div class="row"><span>'+p[0]+'</span><b>'+(p[1]==null?'—':p[1])+'</b></div>';}).join('');
+  const iss=((a.issues)||[]).map(function(i){return '<div class="row"><span><b>'+esc(i.title)+'</b><br><span class="muted">'+esc(i.why_specific||'')+'</span></span>'+badge(i.severity, i.severity==='critical'?'crit':i.severity==='warning'?'warn':'neutral')+'</div>';}).join('')||'<div class="muted">No open issues.</div>';
+  return '<div class="card"><div style="display:flex;justify-content:space-between"><b>Site health</b><b>'+(a.health_score==null?'—':a.health_score)+'/100</b></div>'+(a.ai_commentary?'<div class="muted" style="margin-top:6px">'+esc(a.ai_commentary)+'</div>':'')+sc+'</div>'+
+    '<div class="card"><b>Issues</b>'+iss+'</div>';
+}
+function wins(){
+  const w=(DATA.quickwins&&DATA.quickwins.quick_wins)||[]; if(!w.length) return '<div class="card center">No quick wins right now — nice work.</div>';
+  return w.map(function(x){return '<div class="card"><div style="display:flex;justify-content:space-between"><b>'+esc(x.title)+'</b>'+badge((x.impact||'')+' impact', x.impact==='high'?'ok':x.impact==='medium'?'warn':'neutral')+'</div><div class="muted" style="margin:6px 0">'+esc(x.why)+'</div>'+(x.automated?'<button class="btn" data-gen="1">Generate fix</button>':badge('Guided fix','neutral'))+'</div>';}).join('')+'<div id="genout"></div>';
+}
+function llms(){
+  const l=DATA.llmstxt||{}; return '<div class="card"><b>What is LLMs.txt?</b><div class="muted" style="margin-top:6px">A file at your store root that tells AI assistants which of your pages matter most — a sitemap written for AI.</div></div>'+
+  '<div class="card"><div style="display:flex;justify-content:space-between"><b>Your LLMs.txt</b>'+(l.currently_live?badge('Live','ok'):badge('Not published','warn'))+'</div><pre id="llmsbox">'+esc(l.content||'(generating…)')+'</pre><button class="btn" data-regen="1">Regenerate</button></div>';
+}
+function settings(){
+  return '<div class="card"><b>Connected store</b><div class="row"><span class="muted">Store</span><span>'+esc(DATA.shop)+'</span></div></div>'+
+  '<div class="card"><b>Rescan</b><div class="muted" style="margin:6px 0">Run a fresh AI visibility scan and site crawl now.</div><button class="btn sec" data-scan="1">Rescan store</button> <span id="scanout" class="muted"></span></div>'+
+  '<div class="card"><b>Advanced</b><div class="muted" style="margin:6px 0">Content, outreach and deeper controls live in the full Ralf platform.</div><a class="btn sec" href="https://app.ralfhq.com" target="_blank">Open Ralf platform</a></div>';
+}
+function wire(){
+  document.querySelectorAll('[data-gen]').forEach(function(b){b.onclick=async function(){b.textContent='Generating…';const r=await call('gen-llms');document.getElementById('genout').innerHTML='<div class="card"><b>Generated llms.txt</b><pre>'+esc(r.content||'')+'</pre></div>';b.textContent='Generate fix';};});
+  const rg=document.querySelector('[data-regen]'); if(rg) rg.onclick=async function(){rg.textContent='Regenerating…';const r=await call('gen-llms');document.getElementById('llmsbox').textContent=r.content||'';rg.textContent='Regenerate';};
+  const sc=document.querySelector('[data-scan]'); if(sc) sc.onclick=async function(){sc.textContent='Queuing…';await call('scan');document.getElementById('scanout').textContent='Rescan queued.';sc.textContent='Rescan store';};
+}
+if(window.shopify&&window.shopify.idToken){ boot(); } else { window.addEventListener('load',boot); }
+</script>
+</body>
+</html>

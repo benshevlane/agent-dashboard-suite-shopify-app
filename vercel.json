@@ -1,0 +1,6 @@
+{
+  "framework": null,
+  "installCommand": "echo no-install-needed",
+  "buildCommand": "mkdir -p _static && cp index.html _static/index.html",
+  "outputDirectory": "_static"
+}
