@@ -59,7 +59,7 @@ async function token(){
 async function call(action){
   const t = await token();
   const r = await fetch(FN+'?action='+(action||'data'), {method:'POST', headers:{Authorization:'Bearer '+t}});
-  if(!r.ok){ const tx=await r.text().catch(()=>''); throw new Error('Server '+r.status+' '+tx.slice(0,120)); }
+  if(!r.ok){ const tx=await r.text().catch(()=>''); throw new Error('Server '+r.status+' '+tx.slice(0,600)); }
   return r.json();
 }
 async function boot(){
