@@ -6,7 +6,7 @@
 // serverless platform. All calls are authenticated with the shared app secret.
 // =============================================================================
 
-import { Session } from "@shopify/shopify-api";
+import { Session } from "@shopify/shopify-app-remix/server";
 import type { SessionStorage } from "@shopify/shopify-app-session-storage";
 
 const RALF_API_BASE =

@@ -18,8 +18,9 @@ const shopify = shopifyApp({
   sessionStorage: new RalfSessionStorage(),
   distribution: AppDistribution.AppStore,
   future: {
-    unstable_newEmbeddedAuthStrategy: true,
-    removeRest: true,
+    // v4: new embedded auth (token exchange) is the default; just opt into
+    // the current offline-token behaviour to match the template.
+    expiringOfflineAccessTokens: true,
   },
   hooks: {
     afterAuth: async ({ session, admin }) => {
