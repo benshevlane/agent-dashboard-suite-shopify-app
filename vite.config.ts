@@ -1,5 +1,4 @@
 import { vitePlugin as remix } from "@remix-run/dev";
-import { vercelPreset } from "@vercel/remix/vite";
 import { defineConfig } from "vite";
 
 declare module "@remix-run/node" {
@@ -16,8 +15,6 @@ export default defineConfig({
   },
   plugins: [
     remix({
-      // Deploys to Vercel; harmless for local `shopify app dev`.
-      presets: [vercelPreset()],
       ignoredRouteFiles: ["**/.*"],
       future: {
         v3_fetcherPersist: true,

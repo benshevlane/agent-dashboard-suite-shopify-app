@@ -1,17 +1,20 @@
-import {
-  Links,
-  Meta,
-  Outlet,
-  Scripts,
-  ScrollRestoration,
-} from "@remix-run/react";
+import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLoaderData } from "@remix-run/react";
+
+// Load App Bridge on every page (incl. the embedded auth bounce) so the
+// session-token handshake can complete. Per Shopify's embedded-app docs.
+export const loader = async () => {
+  return { apiKey: process.env.SHOPIFY_API_KEY || "" };
+};
 
 export default function App() {
+  const { apiKey } = useLoaderData<typeof loader>();
   return (
     <html lang="en">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <meta name="shopify-api-key" content={apiKey} />
+        <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
         <link rel="preconnect" href="https://cdn.shopify.com/" />
         <link
           rel="stylesheet"
