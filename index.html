@@ -44,17 +44,27 @@
 </div>
 <script>
 const FN="https://ewkrubluzctsfnkxnmsj.supabase.co/functions/v1/shopify-embedded-app";
-let TOKEN=null, DATA=null, TAB='dash';
+let DATA=null, TAB='dash';
 function esc(s){return (s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
-async function token(){ if(!TOKEN) TOKEN= await shopify.idToken(); return TOKEN; }
+function urlToken(){ try{ return new URLSearchParams(location.search).get('id_token'); }catch(_){ return null; } }
+async function token(){
+  // Prefer a fresh token from App Bridge (with a timeout so it can never hang),
+  // fall back to the id_token Shopify puts in the page URL on load.
+  if(window.shopify && typeof shopify.idToken==='function'){
+    try{ return await Promise.race([shopify.idToken(), new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),6000))]); }catch(_){ /* fall back */ }
+  }
+  const u=urlToken(); if(u) return u;
+  throw new Error('No session token from Shopify');
+}
 async function call(action){
   const t = await token();
   const r = await fetch(FN+'?action='+(action||'data'), {method:'POST', headers:{Authorization:'Bearer '+t}});
+  if(!r.ok){ const tx=await r.text().catch(()=>''); throw new Error('Server '+r.status+' '+tx.slice(0,120)); }
   return r.json();
 }
 async function boot(){
   try{ DATA = await call('data'); render(); }
-  catch(e){ document.getElementById('view').innerHTML='<div class="card">Could not load. '+esc(e&&e.message)+'</div>'; }
+  catch(e){ document.getElementById('view').innerHTML='<div class="card">Couldn’t load your data. '+esc(e&&e.message)+'<br><br><button class="btn" onclick="location.reload()">Retry</button></div>'; }
 }
 document.getElementById('tabs').addEventListener('click',e=>{ if(e.target.dataset.t){ TAB=e.target.dataset.t; document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.t===TAB)); render(); }});
 function badge(txt,kind){return '<span class="badge b-'+kind+'">'+esc(txt)+'</span>';}
